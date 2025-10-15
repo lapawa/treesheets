@@ -68,11 +68,18 @@ struct Text {
     wxString ToText(int indent, const Selection &s, int format) {
         wxString str = s.cursor != s.cursorend ? t.Mid(s.cursor, s.cursorend - s.cursor) : t;
         if (format == A_EXPXML || format == A_EXPHTMLT || format == A_EXPHTMLTI ||
-            format == A_EXPHTMLO || format == A_EXPHTMLB)
+            format == A_EXPHTMLTE || format == A_EXPHTMLO || format == A_EXPHTMLB)
             str = htmlify(str);
         if (format == A_EXPHTMLTI && image)
             str.Prepend(L"<img src=\"data:" + imagetypes.at(image->type).second + ";base64," +
                         wxBase64Encode(image->data.data(), image->data.size()) + "\" />");
+        else if (format == A_EXPHTMLTE && image) {
+            wxString relsize = wxString::Format(
+                "%d%%", static_cast<int>(100.0 * sys->frame->FromDIP(1.0) / image->display_scale));
+            str.Prepend(L"<img src=\"" + wxString::Format("%llu", image->hash) + L"." +
+                        (image->type == 'I' ? L"png" : L"jpg") + L"\" width=\"" + relsize +
+                        L"\" height=\"" + relsize + L"\" />");
+        }
         return str;
     };
 
@@ -117,7 +124,7 @@ struct Text {
     }
 
     wxString GetLine(auto &i, auto maxcolwidth) {
-        auto l = (int)t.Len();
+        auto l = static_cast<int>(t.Len());
 
         if (i >= l) return wxEmptyString;
 
@@ -151,7 +158,7 @@ struct Text {
             if (!curl.Len()) break;
             int x, y;
             if (tiny) {
-                x = (int)curl.Len();
+                x = static_cast<int>(curl.Len());
                 y = 1;
             } else
                 dc.GetTextExtent(curl, &x, &y);
@@ -205,7 +212,7 @@ struct Text {
             if (!curl.Len()) break;
             if (cell->tiny) {
                 if (sys->fastrender) {
-                    dc.DrawLine(bx + ixs, by + lines * h, bx + ixs + (int)curl.Len(),
+                    dc.DrawLine(bx + ixs, by + lines * h, bx + ixs + static_cast<int>(curl.Len()),
                                 by + lines * h);
                     /*
                     wxPoint points[] = { wxPoint(bx + ixs, by + lines * h), wxPoint(bx + ixs +
@@ -213,8 +220,8 @@ struct Text {
                      */
                 } else {
                     auto word = 0;
-                    loop(p, (int)curl.Len() + 1) {
-                        if ((int)curl.Len() <= p || curl[p] == ' ') {
+                    loop(p, static_cast<int>(curl.Len()) + 1) {
+                        if (static_cast<int>(curl.Len()) <= p || curl[p] == ' ') {
                             if (word)
                                 dc.DrawLine(bx + p - word + ixs, by + lines * h, bx + p,
                                             by + lines * h);
@@ -270,8 +277,8 @@ struct Text {
             ls.Truncate(ls.Len() - 1);
         }
 
-        s.cursor = s.cursorend = linestart + (int)ls.Len();
-        ASSERT(s.cursor >= 0 && s.cursor <= (int)t.Len());
+        s.cursor = s.cursorend = linestart + static_cast<int>(ls.Len());
+        ASSERT(s.cursor >= 0 && s.cursor <= static_cast<int>(t.Len()));
     }
 
     void DrawCursor(Document *doc, wxDC &dc, Selection &s, bool full, uint color, int maxcolwidth) {
@@ -285,7 +292,7 @@ struct Text {
             for (auto l = 0;; l++) {
                 auto start = i;
                 auto ls = GetLine(i, maxcolwidth);
-                auto len = (int)ls.Len();
+                auto len = static_cast<int>(ls.Len());
                 auto end = start + len;
 
                 if (s.cursor != s.cursorend) {
@@ -300,7 +307,7 @@ struct Text {
                             int starty =
                                 cell->GetY(doc) + l * h + 1 + cell->ycenteroff + g_margin_extra;
                             DrawRectangle(dc, color, startx, starty, x2 - x1, h - 1, true);
-                            HintIMELocation(doc, startx, starty);
+                            HintIMELocation(doc, startx, starty, h - 1, stylebits);
                         }
                     }
                 } else if (s.cursor >= start && s.cursor <= end) {
@@ -310,7 +317,7 @@ struct Text {
                     int startx = cell->GetX(doc) + x + 1 + ixs + g_margin_extra;
                     int starty = cell->GetY(doc) + l * h + 1 + cell->ycenteroff + g_margin_extra;
                     DrawRectangle(dc, color, startx, starty, 2, h - 2);
-                    HintIMELocation(doc, startx, starty);
+                    HintIMELocation(doc, startx, starty, h - 2, stylebits);
                     break;
                 }
 
@@ -322,11 +329,11 @@ struct Text {
     void ExpandToWord(Selection &s) {
         if (!wxIsalnum(t[s.cursor])) return;
         while (s.cursor > 0 && wxIsalnum(t[s.cursor - 1])) s.cursor--;
-        while (s.cursorend < (int)t.Len() && wxIsalnum(t[s.cursorend])) s.cursorend++;
+        while (s.cursorend < static_cast<int>(t.Len()) && wxIsalnum(t[s.cursorend])) s.cursorend++;
     }
 
     void SelectWord(Selection &s) {
-        if (s.cursor >= (int)t.Len()) return;
+        if (s.cursor >= static_cast<int>(t.Len())) return;
         s.cursorend = s.cursor + 1;
         ExpandToWord(s);
     }
@@ -367,7 +374,7 @@ struct Text {
         RangeSelRemove(s);
         if (!prevl && !keeprelsize) SetRelSize(s);
         t.insert(s.cursor, ins);
-        s.cursor = s.cursorend = s.cursor + (int)ins.Len();
+        s.cursor = s.cursorend = s.cursor + static_cast<int>(ins.Len());
     }
     void Key(Document *doc, int k, Selection &s) {
         wxString ins;
@@ -377,7 +384,7 @@ struct Text {
 
     void Delete(Selection &s) {
         if (!RangeSelRemove(s))
-            if (s.cursor < (int)t.Len()) { t.Remove(s.cursor, 1); };
+            if (s.cursor < static_cast<int>(t.Len())) { t.Remove(s.cursor, 1); };
     }
     void Backspace(Selection &s) {
         if (!RangeSelRemove(s))

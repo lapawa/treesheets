@@ -240,31 +240,29 @@ static void GetFilesFromUser(wxArrayString &filenames, wxWindow *parent, const w
     if (filedialog.ShowModal() == wxID_OK) filedialog.GetPaths(filenames);
 }
 
-static void HintIMELocation(Document *doc, int bx, int by) {
+static void HintIMELocation(Document *doc, int bx, int by, int bh, int stylebits) {
     // TODO: implement on other platforms
     #ifdef __WXMSW__
         HWND hwnd = doc->canvas->GetHandle();
         if (hwnd == 0) return;
-        int windowx = doc->centerx + (bx + doc->hierarchysize) * doc->currentviewscale;
-        int windowy = doc->centery + (by + doc->hierarchysize) * doc->currentviewscale;
+        int scrollx, scrolly;
+        doc->canvas->GetViewStart(&scrollx, &scrolly);
+        int imx = doc->centerx + (bx + doc->hierarchysize) * doc->currentviewscale - scrollx;
+        int imy = doc->centery + (by + doc->hierarchysize) * doc->currentviewscale - scrolly;
         if (HIMC himc = ImmGetContext(hwnd)) {
-            // Place composition window at the cursor position
-            COMPOSITIONFORM cof = {
-                .dwStyle = CFS_FORCE_POSITION,
-                .ptCurrentPos = {
-                    .x = windowx,
-                    .y = windowy
-                }
-            };
+            COMPOSITIONFORM cof = {.dwStyle = CFS_FORCE_POSITION,
+                                   .ptCurrentPos = {.x = imx, .y = imy}};
             ImmSetCompositionWindow(himc, &cof);
-            // Place candidate window (list to choose from) at the cursor position
-            CANDIDATEFORM caf = {
-                .dwStyle = CFS_CANDIDATEPOS,
-                .ptCurrentPos = {
-                    .x = windowx,
-                    .y = windowy
-                }
-            };
+            LOGFONT lf = {.lfHeight = static_cast<LONG>(-bh * doc->currentviewscale),
+                          .lfWeight = stylebits & STYLE_BOLD ? FW_BOLD : FW_REGULAR,
+                          .lfItalic = static_cast<BYTE>(stylebits & STYLE_ITALIC),
+                          .lfUnderline = static_cast<BYTE>(stylebits & STYLE_UNDERLINE),
+                          .lfStrikeOut = static_cast<BYTE>(stylebits & STYLE_STRIKETHRU),
+                          .lfPitchAndFamily = static_cast<BYTE>(stylebits & STYLE_FIXED
+                                                                    ? FIXED_PITCH | FF_MODERN
+                                                                    : VARIABLE_PITCH | FF_SWISS)};
+            ImmSetCompositionFont(himc, &lf);
+            CANDIDATEFORM caf = {.dwStyle = CFS_CANDIDATEPOS, .ptCurrentPos = {.x = imx, .y = imy}};
             ImmSetCandidateWindow(himc, &caf);
             ImmReleaseContext(hwnd, himc);
         }

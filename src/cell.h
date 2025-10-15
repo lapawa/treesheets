@@ -86,7 +86,7 @@ struct Cell {
     }
 
     void Layout(Document *doc, wxDC &dc, int depth, int maxcolwidth, bool forcetiny) {
-        tiny = (text.filtered && !grid) || forcetiny ||
+        tiny = text.filtered && !grid || forcetiny ||
                doc->PickFont(dc, depth, text.relsize, text.stylebits);
         int ixs = 0, iys = 0;
         if (!tiny) sys->ImageSize(text.DisplayImage(), ixs, iys);
@@ -216,13 +216,14 @@ struct Cell {
     wxString ToText(int indent, const Selection &sel, int format, Document *doc, bool inheritstyle,
                     Cell *root) {
         wxString str = text.ToText(indent, sel, format);
-        if ((format == A_EXPHTMLT || format == A_EXPHTMLTI) &&
+        if ((format == A_EXPHTMLT || format == A_EXPHTMLTI || format == A_EXPHTMLTE) &&
             (text.stylebits & (STYLE_UNDERLINE | STYLE_STRIKETHRU)) && this != root &&
             !str.IsEmpty()) {
-            wxString spanstyle = L"text-decoration:";
-            spanstyle += (text.stylebits & STYLE_UNDERLINE) ? L" underline" : wxEmptyString;
-            spanstyle += (text.stylebits & STYLE_STRIKETHRU) ? L" line-through" : wxEmptyString;
-            spanstyle += L";";
+            wxString spanstyle =
+                wxString(L"text-decoration:") +
+                wxString(text.stylebits & STYLE_UNDERLINE ? L" underline" : L"") +
+                wxString(text.stylebits & STYLE_STRIKETHRU ? L" line-through" : L"") +
+                wxString(L";");
             str.Prepend(L"<span style=\"" + spanstyle + L"\">");
             str.Append(L"</span>");
         }
@@ -248,12 +249,12 @@ struct Cell {
             }
             if (cellcolor != 0xFFFFFF) {
                 str.Prepend(L"\"");
-                str.Prepend(wxString::Format(wxT("0x%06X"), cellcolor));
+                str.Prepend(wxString::Format(L"0x%06X", cellcolor));
                 str.Prepend(L" colorbg=\"");
             }
             if (textcolor != 0x000000) {
                 str.Prepend(L"\"");
-                str.Prepend(wxString::Format(wxT("0x%06X"), textcolor));
+                str.Prepend(wxString::Format(L"0x%06X", textcolor));
                 str.Prepend(L" colorfg=\"");
             }
             if (celltype != CT_DATA) {
@@ -264,20 +265,21 @@ struct Cell {
             str.Prepend(L"<cell");
             str.Append(L' ', indent);
             str.Append(L"</cell>\n");
-        } else if ((format == A_EXPHTMLT || format == A_EXPHTMLTI) && this != root) {
+        } else if ((format == A_EXPHTMLT || format == A_EXPHTMLTI || format == A_EXPHTMLTE) &&
+                   this != root) {
             wxString style;
             if (!inheritstyle || !parent ||
                 (text.stylebits & STYLE_BOLD) != (parent->text.stylebits & STYLE_BOLD))
                 style +=
-                    (text.stylebits & STYLE_BOLD) ? L"font-weight: bold;" : L"font-weight: normal;";
+                    text.stylebits & STYLE_BOLD ? L"font-weight: bold;" : L"font-weight: normal;";
             if (!inheritstyle || !parent ||
                 (text.stylebits & STYLE_ITALIC) != (parent->text.stylebits & STYLE_ITALIC))
-                style += (text.stylebits & STYLE_ITALIC) ? L"font-style: italic;"
-                                                         : L"font-style: normal;";
+                style +=
+                    text.stylebits & STYLE_ITALIC ? L"font-style: italic;" : L"font-style: normal;";
             if (!inheritstyle || !parent ||
                 (text.stylebits & STYLE_FIXED) != (parent->text.stylebits & STYLE_FIXED))
-                style += (text.stylebits & STYLE_FIXED) ? L"font-family: monospace;"
-                                                        : L"font-family: sans-serif;";
+                style += text.stylebits & STYLE_FIXED ? L"font-family: monospace;"
+                                                      : L"font-family: sans-serif;";
             if (!inheritstyle || cellcolor != (parent ? parent->cellcolor : doc->Background()))
                 style += wxString::Format(L"background-color: #%06X;", SwapColor(cellcolor));
             auto exporttextcolor = IsTag(doc) ? doc->tags[text.t] : textcolor;
@@ -341,7 +343,7 @@ struct Cell {
         dos.Write32(cellcolor);
         dos.Write32(textcolor);
         dos.Write8(drawstyle);
-        uint cellflags = (this == ocs) ? TS_SELECTION_MASK : 0;
+        uint cellflags = this == ocs ? TS_SELECTION_MASK : 0;
         if (HasTextState()) {
             cellflags |= grid ? TS_BOTH : TS_TEXT;
             dos.Write8(cellflags);
@@ -539,7 +541,7 @@ struct Cell {
     }
 
     Cell *Graph() {
-        auto n = (int)text.GetNum();
+        auto n = text.GetNum();
         text.t.Clear();
         text.t.Append(L'|', n);
         return this;

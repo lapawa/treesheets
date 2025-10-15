@@ -110,8 +110,8 @@ class Selection {
 
     inline bool IsWordSep(wxChar ch) {
         // represents: !"#$%&'()*+,-./    :;<=>?@    [\]^    {|}~    `
-        return (32 < ch && ch < 48) || (57 < ch && ch < 65) || (90 < ch && ch < 95) ||
-               (122 < ch && ch < 127) || ch == 96;
+        return 32 < ch && ch < 48 || 57 < ch && ch < 65 || 90 < ch && ch < 95 ||
+               122 < ch && ch < 127 || ch == 96;
     }
 
     inline int CharType(wxChar ch) {
@@ -216,7 +216,7 @@ class Selection {
                                 for (int l = 0;; l++) {
                                     int start = i;
                                     auto ls = text.GetLine(i, maxcolwidth);
-                                    int len = (int)ls.Len();
+                                    auto len = static_cast<int>(ls.Len());
                                     int end = start + len;
 
                                     if (len && nextoffset >= 0) {

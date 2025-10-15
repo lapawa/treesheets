@@ -53,6 +53,7 @@ struct System {
     uint lastcellcolor {0xFFFFFF};
     uint lasttextcolor {0};
     uint lastbordcolor {0xA0A0A0};
+    Image *lastimage {nullptr};
     int customcolor {0xFFFFFF};
     int cursorcolor {0x00FF00};
 
@@ -67,7 +68,7 @@ struct System {
         pen_thinselect.SetDashes(2, tspattern);
         pen_thinselect.SetStyle(wxPENSTYLE_USER_DASH);
 
-        roundness = (int)cfg->Read(L"roundness", roundness);
+        roundness = static_cast<int>(cfg->Read(L"roundness", roundness));
         defaultfont = cfg->Read(L"defaultfont", defaultfont);
         defaultfixedfont = cfg->Read(L"defaultfixedfont", defaultfixedfont);
         cfg->Read(L"defaultmaxcolwidth", &defaultmaxcolwidth, defaultmaxcolwidth);
@@ -107,7 +108,7 @@ struct System {
     void Init(const wxString &filename) {
         evaluator.Init();
 
-        auto numfiles = (int)cfg->Read(L"numopenfiles", (long)0);
+        auto numfiles = static_cast<int>(cfg->Read(L"numopenfiles", static_cast<long>(0)));
         loop(i, numfiles) {
             wxString filename;
             cfg->Read(wxString::Format(L"lastopenfile_%d", i), &filename);
@@ -288,7 +289,8 @@ struct System {
                             wxString::Format(
                                 _(L"Loaded %s (%d cells, %d characters) in %d milliseconds."),
                                 filename.c_str(), numcells, textbytes,
-                                (int)((end_loading_time - start_loading_time).GetValue()))
+                                static_cast<int>(
+                                    (end_loading_time - start_loading_time).GetValue()))
                                 .c_str());
 
                         goto done;
@@ -346,9 +348,9 @@ struct System {
     void RememberOpenFiles() {
         auto namedfiles = 0;
         loop(i, frame->notebook->GetPageCount()) {
-            auto page = (TSCanvas *)frame->notebook->GetPage(i);
-            if (page->doc->filename.Len()) {
-                cfg->Write(wxString::Format(L"lastopenfile_%d", namedfiles), page->doc->filename);
+            auto canvas = static_cast<TSCanvas *>(frame->notebook->GetPage(i));
+            if (canvas->doc->filename.Len()) {
+                cfg->Write(wxString::Format(L"lastopenfile_%d", namedfiles), canvas->doc->filename);
                 namedfiles++;
             }
         }
@@ -359,7 +361,8 @@ struct System {
 
     void SaveCheck() {
         loop(i, frame->notebook->GetPageCount()) {
-            ((TSCanvas *)frame->notebook->GetPage(i))->doc->AutoSave(!frame->IsActive(), i);
+            static_cast<TSCanvas *>(frame->notebook->GetPage(i))
+                ->doc->AutoSave(!frame->IsActive(), i);
         }
     }
 
@@ -405,13 +408,16 @@ struct System {
                                 FillRows(root->grid, lines, CountCol(lines[0]), 0, 0);
                             }; break;
                             case A_IMPTXTC:
-                                InitDB(1, (int)lines.size())->grid->CSVImport(lines, L',');
+                                InitDB(1, static_cast<int>(lines.size()))
+                                    ->grid->CSVImport(lines, L',');
                                 break;
                             case A_IMPTXTS:
-                                InitDB(1, (int)lines.size())->grid->CSVImport(lines, L';');
+                                InitDB(1, static_cast<int>(lines.size()))
+                                    ->grid->CSVImport(lines, L';');
                                 break;
                             case A_IMPTXTT:
-                                InitDB(1, (int)lines.size())->grid->CSVImport(lines, L'\t');
+                                InitDB(1, static_cast<int>(lines.size()))
+                                    ->grid->CSVImport(lines, L'\t');
                                 break;
                         }
                     break;
@@ -529,7 +535,7 @@ struct System {
                 y++;
             }
         }
-        return (int)as.size();
+        return static_cast<int>(as.size());
     }
 
     int AddImageToList(double scale, auto &&data, char iti) {

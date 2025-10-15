@@ -211,10 +211,10 @@ struct Document {
         UpdateFileName(page);
         if (success) *success = true;
 
-        sys->frame->SetStatus(
-            wxString::Format(_(L"Saved %s successfully (in %d milliseconds)."), filename.c_str(),
-                             (int)((end_saving_time - start_saving_time).GetValue()))
-                .c_str());
+        sys->frame->SetStatus(wxString::Format(_(L"Saved %s successfully (in %lld milliseconds)."),
+                                               filename.c_str(),
+                                               end_saving_time - start_saving_time)
+                                  .c_str());
 
         return _(L"");
     }
@@ -416,7 +416,7 @@ struct Document {
             if (drawroot->grid && drawroot->grid->folded)
                 SetSelect(drawroot->parent->grid->FindCell(drawroot));
         }
-        if (auto diff = (int)drawpath.size() - max(0, len); diff > 0)
+        if (auto diff = static_cast<int>(drawpath.size()) - max(0, len); diff > 0)
             drawpath.erase(drawpath.begin(), drawpath.begin() + diff);
     }
 
@@ -503,7 +503,7 @@ struct Document {
             if (p->text.t.Len()) {
                 int off = hierarchysize - dc.GetCharHeight() * ++i;
                 auto s = p->text.t;
-                if ((int)s.Len() > sys->defaultmaxcolwidth) {
+                if (static_cast<int>(s.Len()) > sys->defaultmaxcolwidth) {
                     // should take the width of these into account for layoutys, but really, the
                     // worst that can happen on a thin window is that its rendering gets cut off
                     s = s.Left(sys->defaultmaxcolwidth) + L"...";
@@ -521,8 +521,8 @@ struct Document {
         if (!root) return;
         canvas->GetClientSize(&maxx, &maxy);
         Layout(dc);
-        double xscale = maxx / (double)layoutxs;
-        double yscale = maxy / (double)layoutys;
+        double xscale = maxx / static_cast<double>(layoutxs);
+        double yscale = maxy / static_cast<double>(layoutys);
         currentviewscale = min(xscale, yscale);
         if (currentviewscale > 5)
             currentviewscale = 5;
@@ -746,6 +746,8 @@ struct Document {
                     dos.WriteString(content);
                     break;
                 case A_EXPHTMLT:
+                case A_EXPHTMLTI:
+                case A_EXPHTMLTE:
                 case A_EXPHTMLB:
                 case A_EXPHTMLO:
                     dos.WriteString(
@@ -766,6 +768,7 @@ struct Document {
                 case A_EXPCSV:
                 case A_EXPTEXT: dos.WriteString(content); break;
             }
+            if (action == A_EXPHTMLTE) ExportAllImages(filename, exportroot);
         }
         return _(L"File exported successfully.");
     }
@@ -790,7 +793,7 @@ struct Document {
     }
 
     const wxChar *Key(int uk, int k, bool alt, bool ctrl, bool shift, bool &unprocessed) {
-        if (uk == WXK_NONE || (k < ' ' && k) || k == WXK_DELETE) {
+        if (uk == WXK_NONE || k < ' ' && k || k == WXK_DELETE) {
             switch (k) {
                 case WXK_BACK:  // no menu shortcut available in wxwidgets
                     if (!ctrl) return Action(A_BACKSPACE);
@@ -904,6 +907,7 @@ struct Document {
 
             case A_EXPXML: return Export(L"xml", L"*.xml", _(L"Choose XML file to write"), action);
             case A_EXPHTMLT:
+            case A_EXPHTMLTE:
             case A_EXPHTMLB:
             case A_EXPHTMLO:
                 return Export(L"html", L"*.html", _(L"Choose HTML file to write"), action);
@@ -960,9 +964,9 @@ struct Document {
             }
 
             case wxID_NEW: {
-                int size =
-                    (int)::wxGetNumberFromUser(_(L"What size grid would you like to start with?"),
-                                               _(L"size:"), _(L"New Sheet"), 10, 1, 25, sys->frame);
+                int size = static_cast<int>(
+                    ::wxGetNumberFromUser(_(L"What size grid would you like to start with?"),
+                                          _(L"size:"), _(L"New Sheet"), 10, 1, 25, sys->frame));
                 if (size < 0) return _(L"New file cancelled.");
                 sys->InitDB(size);
                 sys->frame->GetCurrentTab()->Refresh();
@@ -1516,8 +1520,9 @@ struct Document {
                                     true);
                 } else {
                     selected.EnterEdit(
-                        this, action == A_ENTERCELL_JUMPTOEND ? (int)cell->text.t.Len() : 0,
-                        (int)cell->text.t.Len());
+                        this,
+                        action == A_ENTERCELL_JUMPTOEND ? static_cast<int>(cell->text.t.Len()) : 0,
+                        static_cast<int>(cell->text.t.Len()));
                     RefreshMove();
                 }
                 return nullptr;
@@ -1590,6 +1595,7 @@ struct Document {
             case A_LASTCELLCOLOR:
             case A_LASTTEXTCOLOR:
             case A_LASTBORDCOLOR:
+            case A_LASTIMAGE:
                 selected.grid->cell->AddUndo(this);
                 loopallcellssel(c, true) switch (action) {
                     case A_RESETSIZE: c->text.relsize = 0; break;
@@ -1610,6 +1616,9 @@ struct Document {
                     case A_LASTTEXTCOLOR: c->textcolor = sys->lasttextcolor; break;
                     case A_LASTBORDCOLOR:
                         if (c->grid) c->grid->bordercolor = sys->lastbordcolor;
+                        break;
+                    case A_LASTIMAGE:
+                        if (sys->lastimage) c->text.image = sys->lastimage;
                         break;
                 }
                 selected.grid->cell->ResetChildren();
@@ -1674,7 +1683,8 @@ struct Document {
                 for (auto image : imagestomanipulate) {
                     if (action == A_IMAGESCW) {
                         int pw = image->pixel_width;
-                        if (pw) image->ImageRescale((double)v / (double)pw);
+                        if (pw)
+                            image->ImageRescale(static_cast<double>(v) / static_cast<double>(pw));
                     } else if (action == A_IMAGESCP) {
                         image->ImageRescale(v / 100.0);
                     } else {
@@ -1710,7 +1720,7 @@ struct Document {
                 for (Image *im : is) {
                     wxFileName fn(f);
                     wxString tf = fn.GetPathWithSep() + fn.GetName() +
-                                  ((i == 0) ? wxString() : wxString::Format(L"%d", i)) +
+                                  (i == 0 ? wxString() : wxString::Format(L"%d", i)) +
                                   wxString(L".") + fn.GetExt();
                     wxFFileOutputStream os(tf, L"w+b");
                     if (!os.IsOk()) {
@@ -1933,7 +1943,7 @@ struct Document {
                                    // within line
                         selected.cursor = 0;
                         break;
-                    case A_SEND: selected.cursorend = (int)cell->text.t.Len(); break;
+                    case A_SEND: selected.cursorend = static_cast<int>(cell->text.t.Len()); break;
                     case A_CHOME: selected.cursor = selected.cursorend = 0; break;
                     case A_CEND: selected.cursor = selected.cursorend = selected.MaxCursor(); break;
                     case A_HOME: cell->text.HomeEnd(selected, true); break;
@@ -2125,7 +2135,7 @@ struct Document {
         size_t total_usage = 0;
         size_t old_list_size = undolist.size();
         // Cull undolist. Always at least keeps last item.
-        for (auto i = (int)undolist.size() - 1; i >= 0; i--) {
+        for (auto i = static_cast<int>(undolist.size()) - 1; i >= 0; i--) {
             // Cull old items if using more than 100MB or 1000 items, whichever comes first.
             // TODO: make configurable?
             if (total_usage < 100 * 1024 * 1024 && undolist.size() - i < 1000) {
@@ -2192,7 +2202,8 @@ struct Document {
     }
 
     void SetImageBM(Cell *c, auto &&data, double scale) {
-        c->text.image = sys->imagelist[sys->AddImageToList(scale, std::move(data), 'I')].get();
+        c->text.image = sys->lastimage =
+            sys->imagelist[sys->AddImageToList(scale, std::move(data), 'I')].get();
     }
 
     bool LoadImageIntoCell(const wxString &filename, Cell *c, double scale) {
@@ -2286,5 +2297,16 @@ struct Document {
         loopallcells(c) c->text.filtered = on && !c->text.IsInSearch();
         root->ResetChildren();
         canvas->Refresh();
+    }
+
+    void ExportAllImages(const wxString &filename, Cell *exportroot) {
+        std::set<Image *> exportimages;
+        CollectCells(exportroot);
+        for (auto c : itercells)
+            if (c->text.image) exportimages.insert(c->text.image);
+        wxFileName fn(filename);
+        auto directory = fn.GetPathWithSep();
+        for (auto image : exportimages)
+            if (!image->ExportToDirectory(directory)) break;
     }
 };

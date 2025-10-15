@@ -419,7 +419,7 @@ struct Grid {
             if (sel.TextEdit()) {
                 DrawCursor(doc, dc, sel, true, sys->cursorcolor);
             } else {
-                HintIMELocation(doc, g.x, g.y);
+                HintIMELocation(doc, g.x, g.y, g_deftextsize * 1.333, 0);
             }
         }
     }
@@ -548,7 +548,7 @@ struct Grid {
         if (format == A_EXPXML) {
             r.Append(L' ', indent);
             r.Append(xml);
-        } else if (format == A_EXPHTMLT || format == A_EXPHTMLTI) {
+        } else if (format == A_EXPHTMLT || format == A_EXPHTMLTI || format == A_EXPHTMLTE) {
             r.Append(L' ', indent);
             r.Append(html);
         } else if (format == A_EXPHTMLB && *htmlb) {
@@ -571,12 +571,12 @@ struct Grid {
             cell == doc->root ? root_grid_spacing : user_grid_outer_spacing - 1;
 
         wxString xmlstr(L"<grid");
-        if (folded) xmlstr.Append(wxString::Format(wxT(" folded=\"%d\""), folded));
+        if (folded) xmlstr.Append(wxString::Format(L" folded=\"%d\"", folded));
         if (bordercolor != g_bordercolor_default) {
-            xmlstr.Append(wxString::Format(wxT(" bordercolor=\"0x%06X\""), bordercolor));
+            xmlstr.Append(wxString::Format(L" bordercolor=\"0x%06X\"", bordercolor));
         }
         if (user_grid_outer_spacing != g_usergridouterspacing_default) {
-            xmlstr.Append(wxString::Format(wxT(" outerspacing=\"%d\""), user_grid_outer_spacing));
+            xmlstr.Append(wxString::Format(L" outerspacing=\"%d\"", user_grid_outer_spacing));
         }
         xmlstr.Append(L">\n");
 
@@ -682,7 +682,7 @@ struct Grid {
 
     void CSVImport(const wxArrayString &as, wxString sep) {
         int cy = 0;
-        loop(y, (int)as.size()) {
+        loop(y, as.size()) {
             auto s = as[y];
             wxString word;
             for (int x = 0; s[0]; x++) {
@@ -690,7 +690,7 @@ struct Grid {
                     word = L"";
                     for (int i = 1;; i++) {
                         if (!s[i]) {
-                            if (y < (int)as.size() - 1) {
+                            if (y < static_cast<int>(as.size()) - 1) {
                                 s = as[++y];
                                 i = 0;
                             } else {
