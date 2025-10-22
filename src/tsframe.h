@@ -344,6 +344,8 @@ struct TSFrame : wxFrame {
                      _(L"Convert an NxN grid with repeating elements per column into an 1xN grid with hierarchy, useful to convert data from spreadsheets"));
             MyAppend(orgmenu, A_FLATTEN, _(L"&Flatten"),
                      _(L"Takes a hierarchy (nested 1xN or Nx1 grids) and converts it into a flat NxN grid, useful for export to spreadsheets"));
+            MyAppend(orgmenu, A_RESETCOLWIDTHS, _(L"Reset column widths\tCTRL+R"),
+                     _(L"Reset the column widths in the selection to the default column width"));
 
             auto imgmenu = new wxMenu();
             MyAppend(imgmenu, A_IMAGE, _(L"&Add..."), _(L"Add an image to the selected cell"));
@@ -554,6 +556,14 @@ struct TSFrame : wxFrame {
         roundmenu->AppendRadioItem(A_ROUND6, _(L"Radius &6"));
         roundmenu->Check(sys->roundness + A_ROUND0, true);
 
+        auto autoexportmenu = new wxMenu();
+        autoexportmenu->AppendRadioItem(A_AUTOEXPORT0, _(L"No autoexport"));
+        autoexportmenu->AppendRadioItem(A_AUTOEXPORT1, _(L"Export with images"),
+            _(L"Export to a HTML file with exported images alongside the original TreeSheets file when document is saved"));
+        autoexportmenu->AppendRadioItem(A_AUTOEXPORT2, _(L"Export without images"),
+            _(L"Export to a HTML file alongside the original TreeSheets file when document is saved"));
+        autoexportmenu->Check(sys->autohtmlexport + A_AUTOEXPORT0, true);
+
         auto optmenu = new wxMenu();
         MyAppend(optmenu, wxID_SELECT_FONT, _(L"Font..."),
                  _(L"Set the font the document text is displayed with"));
@@ -612,9 +622,7 @@ struct TSFrame : wxFrame {
             A_FSWATCH, _(L"Autoreload documents"),
             _(L"Reload when another computer has changed a file (if you have made changes, asks)"));
         optmenu->Check(A_FSWATCH, sys->fswatch);
-        optmenu->AppendCheckItem(A_AUTOEXPORT, _(L"Autoexport to HTML"),
-                                 _(L"Export to a HTML file when document is saved"));
-        optmenu->Check(A_AUTOEXPORT, sys->autohtmlexport);
+        optmenu->AppendSubMenu(autoexportmenu, _(L"Autoexport to HTML"));
         optmenu->AppendSeparator();
         optmenu->AppendCheckItem(
             A_CENTERED, _(L"Render document centered"),
@@ -1003,8 +1011,14 @@ struct TSFrame : wxFrame {
                 Check(L"fswatch");
                 sys->fswatch = ce.IsChecked();
                 break;
-            case A_AUTOEXPORT:
-                sys->cfg->Write(L"autohtmlexport", sys->autohtmlexport = ce.IsChecked());
+            case A_AUTOEXPORT0:
+                sys->cfg->Write(L"autohtmlexport", static_cast<long>(sys->autohtmlexport = 0));
+                break;
+            case A_AUTOEXPORT1:
+                sys->cfg->Write(L"autohtmlexport", static_cast<long>(sys->autohtmlexport = 1));
+                break;
+            case A_AUTOEXPORT2:
+                sys->cfg->Write(L"autohtmlexport", static_cast<long>(sys->autohtmlexport = 2));
                 break;
             case A_FASTRENDER:
                 sys->cfg->Write(L"fastrender", sys->fastrender = ce.IsChecked());

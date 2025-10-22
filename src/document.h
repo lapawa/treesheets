@@ -206,7 +206,8 @@ struct Document {
             if (::wxFileExists(sys->TmpName(filename))) ::wxRemoveFile(sys->TmpName(filename));
         }
         if (sys->autohtmlexport) {
-            ExportFile(sys->ExtName(filename, L".html"), A_EXPHTMLT, false);
+            ExportFile(sys->ExtName(filename, L".html"),
+                       sys->autohtmlexport == 1 ? A_EXPHTMLTE : A_EXPHTMLT, false);
         }
         UpdateFileName(page);
         if (success) *success = true;
@@ -1261,6 +1262,17 @@ struct Document {
         }
 
         if (!selected.grid) return NoSel();
+
+        switch (action) {
+            case A_RESETCOLWIDTHS:
+                selected.grid->cell->AddUndo(this);
+                for (int x = selected.x; x < selected.x + selected.xs; x++)
+                    selected.grid->colwidths[x] = sys->defaultmaxcolwidth;
+                selected.grid->cell->ResetLayout();
+                selected.grid->cell->ResetChildren();
+                canvas->Refresh();
+                return nullptr;
+        }
 
         auto cell = selected.GetCell();
 
